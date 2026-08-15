@@ -2,6 +2,9 @@ name: CI
 
 on: [push, pull_request]
 
+permissions:
+  contents: write
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -11,9 +14,15 @@ jobs:
         with:
           node-version: 24
       - run: npm install
-      - name: Preserve generated lock file
-        uses: actions/upload-artifact@v4
-        with:
-          name: package-lock-${{ github.run_id }}
-          path: package-lock.json
+      - name: Commit generated lock file once
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          if [[ -n "$(git status --porcelain -- package-lock.json)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json
+            git commit -m "Add npm lock file"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
       - run: npm run check
