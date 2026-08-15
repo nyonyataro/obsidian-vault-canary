@@ -11,4 +11,9 @@ jobs:
         with:
           node-version: 24
       - run: npm install
+      - name: Preserve generated lock file
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-lock-${{ github.run_id }}
+          path: package-lock.json
       - run: npm run check
