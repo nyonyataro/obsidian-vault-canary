@@ -31,7 +31,6 @@ export class VaultCanarySettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		new Setting(containerEl).setName('Vault Canary').setHeading();
 		containerEl.createEl('p', {
 			text: 'Warn when the visible vault unexpectedly loses files, Markdown notes, or total storage size. Vault Canary never modifies note content.',
 		});
