@@ -1,6 +1,6 @@
 # Manual test plan
 
-Japanese overview: [README.ja.md](../README.ja.md). Run the same scenarios with the plugin display language set to Japanese before a public release.
+Japanese overview: [README.ja.md](../README.ja.md). Run the same scenarios with the plugin display language set to Japanese before each public release.
 
 Use a disposable test vault only. Do not test deletion scenarios against the only copy of real notes.
 
@@ -74,7 +74,7 @@ Use a disposable test vault only. Do not test deletion scenarios against the onl
 4. Confirm file deletion triggers a warning after the debounce period.
 5. Confirm no network permission or external service is required.
 
-## Before a public release
+## Release readiness
 
 - `npm run check` passes in CI.
 - Desktop smoke test passes.
@@ -82,3 +82,4 @@ Use a disposable test vault only. Do not test deletion scenarios against the onl
 - Release tag exactly matches `manifest.json` version and has no `v` prefix.
 - Draft release contains `main.js`, `manifest.json`, and `styles.css`.
 - README accurately describes current behavior and limitations.
+- After publication, the [Community Plugins listing](https://community.obsidian.md/plugins/vault-canary) shows the expected version and description.

@@ -73,9 +73,19 @@ Vault Canary runs locally. It stores only settings, the aggregate baseline, the 
 
 ## Installation
 
-### Beta / BRAT
+### Community Plugins
 
-Before Vault Canary is accepted into Community Plugins, you can install beta releases with BRAT using this repository:
+Vault Canary is available in the official Community Plugins directory:
+
+[Vault Canary in Community Plugins](https://community.obsidian.md/plugins/vault-canary)
+
+1. Open **Settings → Community plugins**.
+2. Select **Browse** and search for `Vault Canary`.
+3. Install the plugin and enable it.
+
+### Pre-release / development install
+
+For unreleased builds, you can use BRAT with this repository:
 
 ```text
 https://github.com/nyonyataro/obsidian-vault-canary
@@ -104,7 +114,7 @@ Production `main.js` is generated during builds and release workflows; it is int
 
 ## Releases
 
-Release tags use plain semantic versions such as `0.1.0` without a `v` prefix. A matching tag creates a draft GitHub release with `main.js`, `manifest.json`, and `styles.css` attached.
+Stable releases are distributed through Community Plugins. Release tags use plain semantic versions such as `0.1.0` without a `v` prefix. A matching tag creates a draft GitHub release with `main.js`, `manifest.json`, and `styles.css` attached; after maintainer review, the release is published and the Community Plugins listing is checked.
 
 ## Support
 

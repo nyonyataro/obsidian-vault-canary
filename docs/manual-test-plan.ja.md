@@ -63,11 +63,12 @@
 3. 猶予中に作成・削除を行っても自動警告されないことを確認する。
 4. 猶予後に確認が行われることを確認する。
 
-## 公開前
+## リリース確認
 
 - [ ] `npm run check`が成功する
 - [ ] `npm run release:check`が成功する
 - [ ] Desktopで日本語/英語の両方を確認する
 - [ ] AndroidまたはiOSの捨てVaultで起動と警告を確認する
 - [ ] GitHub Draft Releaseの成果物を確認する
+- [ ] 公開後に[Community Pluginsの掲載ページ](https://community.obsidian.md/plugins/vault-canary)のバージョンと説明を確認する
 - [ ] privateなVault内容をIssueやスクリーンショットに含めない

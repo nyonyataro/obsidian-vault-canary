@@ -1,4 +1,4 @@
-# Vault Canary リリースチェックリスト
+# Vault Canary リリース・公開チェックリスト
 
 ## 自動検証
 
@@ -11,7 +11,7 @@
 - [ ] `manifest.json`の`fundingUrl`と`.github/FUNDING.yml`がBuy Me a Coffeeを指している
 - [ ] `main.js`、`manifest.json`、`styles.css`がリリース成果物として存在する
 
-## ベータ公開前
+## 公開前のQA（各リリース）
 
 - [ ] Desktopの捨てVaultで手動QAを完了
 - [ ] 日本語UIで設定画面、警告、baseline操作を確認
@@ -32,9 +32,9 @@
 
 タグpushでDraft Release workflowが実行され、検証後に`main.js`、`manifest.json`、`styles.css`がDraft Releaseへ添付される。Draftの内容と変更履歴を確認してから、手動で公開する。
 
-## Community Plugins申請前
+## Community Plugins公開後（各リリース）
 
-- [ ] BRATでベータ版を試して重大な問題がない
+- [ ] GitHub ReleaseをDraftから公開版へ切り替えた
+- [ ] [Community Pluginsの掲載ページ](https://community.obsidian.md/plugins/vault-canary)でバージョンと説明を確認した
 - [ ] README、手動QA、Privacy、Limitationsが現行挙動と一致している
-- [ ] Draft Releaseを公開版へ切り替えた
-- [ ] Community Plugins申請に使うrepository、manifest、release assetを再確認した
+- [ ] repository、manifest、公開release assetを再確認した

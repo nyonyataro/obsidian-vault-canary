@@ -4,6 +4,8 @@
 
 Vault Canaryは、Obsidian Vaultの内容が予期せず大きく減ったときに知らせる、ローカル動作の早期警告プラグインです。
 
+[Community Pluginsの掲載ページ](https://community.obsidian.md/plugins/vault-canary)
+
 これはバックアップや復元機能ではありません。警告が出たら、Git、Obsidian Sync、OneDriveの履歴、その他のバックアップを確認して復旧してください。
 
 ## 何を監視するか
@@ -37,17 +39,27 @@ Vault Canaryは、Obsidian Vaultの内容が予期せず大きく減ったとき
 
 Vaultルートからの相対フォルダを1行に1つ指定できます。指定したフォルダ以下は集計から除外されます。除外範囲を変更すると、異なる対象範囲を比較しないよう基準値が消去されます。
 
-## βテスト
-
-Community Pluginsに掲載される前は、BRATまたは手動インストールで試せます。
-
-手動QAは必ず捨てVaultで行ってください。手順は[日本語の手動テスト計画](docs/manual-test-plan.ja.md)、[英語の手動テスト計画](docs/manual-test-plan.md)、[リリースチェックリスト](docs/release-checklist.md)にあります。
-
 ## インストール
 
-1. Releaseから`main.js`、`manifest.json`、`styles.css`を取得する。
-2. `<Vault>/.obsidian/plugins/vault-canary/`へ3ファイルをコピーする。
-3. ObsidianのCommunity pluginsでVault Canaryを有効化する。
+### Community Plugins
+
+Vault Canaryは公式のCommunity Pluginsに掲載されています。
+
+1. **設定 → Community plugins**を開く。
+2. **Browse**を選び、`Vault Canary`を検索する。
+3. インストールして有効化する。
+
+### 先行版・開発版
+
+未公開ビルドを試す場合は、BRATで次のリポジトリを指定できます。
+
+```text
+https://github.com/nyonyataro/obsidian-vault-canary
+```
+
+手動インストールでは、Releaseから`main.js`、`manifest.json`、`styles.css`を取得し、`<Vault>/.obsidian/plugins/vault-canary/`へコピーしてください。
+
+手動QAは必ず捨てVaultで行ってください。手順は[日本語の手動テスト計画](docs/manual-test-plan.ja.md)、[英語の手動テスト計画](docs/manual-test-plan.md)、[リリースチェックリスト](docs/release-checklist.md)にあります。
 
 ## サポート
 

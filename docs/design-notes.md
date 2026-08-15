@@ -34,7 +34,7 @@ User-facing settings, commands, and notices are kept in English and Japanese dic
 
 ## Release safety
 
-Version metadata is synchronized by the npm `version` lifecycle. The release workflow accepts only `x.y.z` tags, verifies the package/manifest/version mapping, runs the full check suite, checks the release assets and size budget, attaches build provenance, and creates a draft release. Publishing the draft and Community Plugins submission remain manual maintainer decisions.
+Version metadata is synchronized by the npm `version` lifecycle. The release workflow accepts only `x.y.z` tags, verifies the package/manifest/version mapping, runs the full check suite, checks the release assets and size budget, attaches build provenance, and creates a draft release. Publishing the draft and confirming that the Community Plugins listing reflects the published release remain manual maintainer decisions. The initial `0.1.0` release is published and listed.
 
 ## Known MVP trade-off
 
