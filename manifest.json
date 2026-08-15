@@ -2,7 +2,7 @@
 	"id": "vault-canary",
 	"name": "Vault Canary",
 	"version": "0.1.0",
-	"minAppVersion": "1.8.7",
+	"minAppVersion": "1.13.0",
 	"description": "Warns when your vault unexpectedly loses files, Markdown notes, or storage size.",
 	"author": "nyonyataro",
 	"authorUrl": "https://github.com/nyonyataro",

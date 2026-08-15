@@ -2,11 +2,18 @@ import { Notice, Plugin } from 'obsidian';
 import type { TFile } from 'obsidian';
 import {
 	captureSnapshot,
+	currentMetricsCoverBaseline,
 	evaluateShrink,
 	normalizeExcludedFolders,
 	snapshotsHaveSameMetrics,
 } from './core';
 import type { VaultSnapshot } from './core';
+import {
+	isLocalePreference,
+	resolveLocale,
+	t,
+	type Locale,
+} from './i18n';
 import { DEFAULT_SETTINGS, VaultCanarySettingTab } from './settings';
 import type { VaultCanarySettings } from './settings';
 
@@ -14,6 +21,7 @@ interface StoredData {
 	settings?: Partial<VaultCanarySettings>;
 	baseline?: VaultSnapshot;
 	lastAlertAt?: number;
+	pendingShrink?: boolean;
 }
 
 export type CheckTrigger = 'startup' | 'scheduled' | 'event' | 'manual';
@@ -26,11 +34,16 @@ export default class VaultCanaryPlugin extends Plugin {
 	settings: VaultCanarySettings = { ...DEFAULT_SETTINGS };
 	baseline: VaultSnapshot | null = null;
 	private lastAlertAt = 0;
+	private pendingShrink = false;
 	private lastCheckAt = 0;
 	private monitoringAllowedAfter = 0;
 	private checkInFlight = false;
 	private startupTimer: number | null = null;
 	private eventCheckTimer: number | null = null;
+
+	get locale(): Locale {
+		return resolveLocale(this.settings.locale);
+	}
 
 	async onload(): Promise<void> {
 		await this.loadState();
@@ -38,12 +51,12 @@ export default class VaultCanaryPlugin extends Plugin {
 		this.addSettingTab(new VaultCanarySettingTab(this.app, this));
 		this.addCommand({
 			id: 'check-vault-now',
-			name: 'Check vault now',
+			name: t(this.locale, 'command.checkNow'),
 			callback: () => void this.checkVault('manual', true),
 		});
 		this.addCommand({
 			id: 'set-current-baseline',
-			name: 'Set current vault state as baseline',
+			name: t(this.locale, 'command.setBaseline'),
 			callback: () => void this.setCurrentAsBaseline(true),
 		});
 
@@ -74,6 +87,7 @@ export default class VaultCanaryPlugin extends Plugin {
 		this.settings.excludedFolders = normalized;
 		this.baseline = null;
 		this.lastAlertAt = 0;
+		this.pendingShrink = false;
 		await this.saveState();
 	}
 
@@ -81,14 +95,12 @@ export default class VaultCanaryPlugin extends Plugin {
 		const snapshot = this.captureCurrentSnapshot();
 		this.baseline = snapshot;
 		this.lastAlertAt = 0;
+		this.pendingShrink = false;
 		this.lastCheckAt = Date.now();
 		await this.saveState();
 
 		if (showNotice) {
-			new Notice(
-				`Vault Canary baseline set: ${snapshot.fileCount.toLocaleString()} files, ` +
-					`${snapshot.markdownCount.toLocaleString()} Markdown notes, ${formatBytes(snapshot.totalBytes)}.`,
-			);
+			new Notice(t(this.locale, 'notice.baselineSet', this.snapshotValues(snapshot)));
 		}
 	}
 
@@ -107,38 +119,55 @@ export default class VaultCanaryPlugin extends Plugin {
 
 			if (this.baseline === null) {
 				this.baseline = current;
+				this.lastAlertAt = 0;
+				this.pendingShrink = false;
 				await this.saveState();
 				if (forceNotice) {
-					new Notice(
-						`Vault Canary created its first baseline: ${current.fileCount.toLocaleString()} files.`,
-					);
+					new Notice(t(this.locale, 'notice.createdBaseline', {
+						files: current.fileCount.toLocaleString(this.locale),
+					}));
 				}
 				return;
 			}
 
 			const evaluation = evaluateShrink(this.baseline, current, this.settings);
 			if (evaluation.alert) {
+				const pendingStateChanged = !this.pendingShrink;
+				this.pendingShrink = true;
 				const cooldownMs = this.settings.alertCooldownMinutes * 60_000;
 				const cooldownPassed = Date.now() - this.lastAlertAt >= cooldownMs;
 				if (forceNotice || cooldownPassed) {
 					this.lastAlertAt = Date.now();
 					await this.saveState();
-					new Notice(buildAlertMessage(evaluation, this.baseline, current), ALERT_NOTICE_MS);
+					new Notice(buildAlertMessage(evaluation, this.baseline, current, this.locale), ALERT_NOTICE_MS);
+				} else if (pendingStateChanged) {
+					await this.saveState();
 				}
 				return;
 			}
 
+			const alertStateWasActive = this.lastAlertAt !== 0;
+			const pendingShrinkWasActive = this.pendingShrink;
+			const baselineChanged = !snapshotsHaveSameMetrics(this.baseline, current);
+			const shrinkRecovered = currentMetricsCoverBaseline(this.baseline, current);
 			this.lastAlertAt = 0;
-			if (!snapshotsHaveSameMetrics(this.baseline, current)) {
+			if (!this.pendingShrink || shrinkRecovered) {
+				this.pendingShrink = false;
+			}
+			const baselineWillChange = !this.pendingShrink && baselineChanged;
+			if (baselineWillChange) {
 				this.baseline = current;
+			}
+			if (baselineWillChange || alertStateWasActive || pendingShrinkWasActive !== this.pendingShrink) {
 				await this.saveState();
 			}
 
 			if (forceNotice) {
-				new Notice(
-					`Vault Canary found no unexpected shrink: ${current.fileCount.toLocaleString()} files, ` +
-						`${current.markdownCount.toLocaleString()} Markdown notes, ${formatBytes(current.totalBytes)}.`,
-				);
+				if (this.pendingShrink) {
+					new Notice(t(this.locale, 'notice.stillSmaller'));
+				} else {
+					new Notice(t(this.locale, 'notice.noUnexpectedShrink', this.snapshotValues(current)));
+				}
 			}
 		} finally {
 			this.checkInFlight = false;
@@ -151,6 +180,7 @@ export default class VaultCanaryPlugin extends Plugin {
 		this.registerEvent(this.app.vault.on('delete', () => this.scheduleEventCheck()));
 		this.registerEvent(this.app.vault.on('create', () => this.scheduleEventCheck()));
 		this.registerEvent(this.app.vault.on('rename', () => this.scheduleEventCheck()));
+		this.registerEvent(this.app.vault.on('modify', () => this.scheduleEventCheck()));
 
 		this.startupTimer = window.setTimeout(() => {
 			this.startupTimer = null;
@@ -201,10 +231,14 @@ export default class VaultCanaryPlugin extends Plugin {
 		this.settings = {
 			...DEFAULT_SETTINGS,
 			...(data?.settings ?? {}),
+			locale: isLocalePreference(data?.settings?.locale)
+				? data.settings.locale
+				: DEFAULT_SETTINGS.locale,
 			excludedFolders: normalizeExcludedFolders(data?.settings?.excludedFolders ?? []),
 		};
 		this.baseline = data?.baseline ?? null;
 		this.lastAlertAt = data?.lastAlertAt ?? 0;
+		this.pendingShrink = data?.pendingShrink ?? this.lastAlertAt !== 0;
 	}
 
 	private async saveState(): Promise<void> {
@@ -212,8 +246,17 @@ export default class VaultCanaryPlugin extends Plugin {
 			settings: this.settings,
 			baseline: this.baseline ?? undefined,
 			lastAlertAt: this.lastAlertAt,
+			pendingShrink: this.pendingShrink,
 		};
 		await this.saveData(data);
+	}
+
+	private snapshotValues(snapshot: VaultSnapshot): Record<string, string> {
+		return {
+			files: snapshot.fileCount.toLocaleString(this.locale),
+			markdown: snapshot.markdownCount.toLocaleString(this.locale),
+			size: formatBytes(snapshot.totalBytes, this.locale),
+		};
 	}
 }
 
@@ -221,34 +264,38 @@ function buildAlertMessage(
 	evaluation: ReturnType<typeof evaluateShrink>,
 	baseline: VaultSnapshot,
 	current: VaultSnapshot,
+	locale: Locale,
 ): string {
 	const details: string[] = [];
 	if (evaluation.reasons.includes('files')) {
-		details.push(
-			`${evaluation.fileDrop.toLocaleString()} files (${evaluation.fileDropPercent.toFixed(1)}%)`,
-		);
+		details.push(t(locale, 'alert.files', {
+			count: evaluation.fileDrop.toLocaleString(locale),
+			percent: evaluation.fileDropPercent.toFixed(1),
+		}));
 	}
 	if (evaluation.reasons.includes('markdown')) {
-		details.push(
-			`${evaluation.markdownDrop.toLocaleString()} Markdown notes (${evaluation.markdownDropPercent.toFixed(1)}%)`,
-		);
+		details.push(t(locale, 'alert.markdown', {
+			count: evaluation.markdownDrop.toLocaleString(locale),
+			percent: evaluation.markdownDropPercent.toFixed(1),
+		}));
 	}
 	if (evaluation.reasons.includes('size')) {
-		details.push(
-			`${formatBytes(evaluation.sizeDropBytes)} (${evaluation.sizeDropPercent.toFixed(1)}%) of storage`,
-		);
+		details.push(t(locale, 'alert.size', {
+			size: formatBytes(evaluation.sizeDropBytes, locale),
+			percent: evaluation.sizeDropPercent.toFixed(1),
+		}));
 	}
 
-	return (
-		`Vault Canary detected an unexpected shrink: ${details.join(', ')}. ` +
-		`Baseline ${baseline.fileCount.toLocaleString()} → current ${current.fileCount.toLocaleString()} files. ` +
-		'Review sync or backups before accepting the current state as a new baseline.'
-	);
+	return t(locale, 'alert.detected', {
+		details: details.join(locale === 'ja' ? '、' : ', '),
+		baseline: baseline.fileCount.toLocaleString(locale),
+		current: current.fileCount.toLocaleString(locale),
+	});
 }
 
-function formatBytes(bytes: number): string {
+function formatBytes(bytes: number, locale: Locale): string {
 	if (bytes < 1_024) {
-		return `${bytes.toLocaleString()} B`;
+		return `${bytes.toLocaleString(locale)} B`;
 	}
 	const units = ['KB', 'MB', 'GB', 'TB'];
 	let value = bytes / 1_024;

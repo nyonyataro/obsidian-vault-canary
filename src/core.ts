@@ -125,6 +125,17 @@ export function snapshotsHaveSameMetrics(a: VaultSnapshot, b: VaultSnapshot): bo
 	);
 }
 
+export function currentMetricsCoverBaseline(
+	baseline: VaultSnapshot,
+	current: VaultSnapshot,
+): boolean {
+	return (
+		current.fileCount >= baseline.fileCount &&
+		current.markdownCount >= baseline.markdownCount &&
+		current.totalBytes >= baseline.totalBytes
+	);
+}
+
 function isPathExcludedNormalized(path: string, normalizedExcludedFolders: readonly string[]): boolean {
 	const normalizedPath = path.replaceAll('\\', '/').replace(/^\/+/, '');
 	return normalizedExcludedFolders.some(

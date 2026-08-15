@@ -1,5 +1,7 @@
 # Manual test plan
 
+Japanese overview: [README.ja.md](../README.ja.md). Run the same scenarios with the plugin display language set to Japanese before a public release.
+
 Use a disposable test vault only. Do not test deletion scenarios against the only copy of real notes.
 
 ## Desktop smoke test
@@ -20,6 +22,14 @@ Use a disposable test vault only. Do not test deletion scenarios against the onl
 5. Confirm Settings still shows the pre-deletion baseline.
 6. Restore the files and run **Check vault now**; confirm no shrink is reported.
 
+## Warning state persistence
+
+1. Configure **Minimum file drop** to `3` and set the baseline.
+2. Delete three disposable files and confirm an alert appears.
+3. Restore only one or two files and run **Check vault now**.
+4. Confirm the original baseline is still retained and the notice says the smaller state is under review.
+5. Restore all files or explicitly set a new baseline, then confirm the warning state clears.
+
 ## Markdown warning
 
 1. Configure **Minimum Markdown drop** to `2`.
@@ -33,6 +43,13 @@ Use a disposable test vault only. Do not test deletion scenarios against the onl
 2. Set the baseline.
 3. Configure **Storage size drop (%)** low enough to trigger when that attachment is removed.
 4. Delete the attachment and confirm a storage-size warning.
+
+## Modified-file warning
+
+1. Add a disposable attachment large enough to make the size threshold meaningful.
+2. Set the baseline.
+3. Truncate or replace the attachment with a much smaller file without changing its path.
+4. After the debounce period, confirm a storage-size warning appears.
 
 ## Excluded folders
 

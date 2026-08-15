@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { captureSnapshot, evaluateShrink, isPathExcluded } from './core';
+import {
+	captureSnapshot,
+	currentMetricsCoverBaseline,
+	evaluateShrink,
+	isPathExcluded,
+} from './core';
 
 describe('path exclusions', () => {
 	it('matches a folder and its descendants without matching prefix siblings', () => {
@@ -90,5 +95,28 @@ describe('evaluateShrink', () => {
 			thresholds,
 		);
 		expect(result.alert).toBe(false);
+	});
+});
+
+describe('baseline coverage', () => {
+	it('requires every aggregate metric to recover to the baseline', () => {
+		const baseline = { checkedAt: 1, fileCount: 10, markdownCount: 8, totalBytes: 1_000 };
+
+		expect(
+			currentMetricsCoverBaseline(baseline, {
+				checkedAt: 2,
+				fileCount: 11,
+				markdownCount: 8,
+				totalBytes: 1_000,
+			}),
+		).toBe(true);
+		expect(
+			currentMetricsCoverBaseline(baseline, {
+				checkedAt: 2,
+				fileCount: 11,
+				markdownCount: 8,
+				totalBytes: 999,
+			}),
+		).toBe(false);
 	});
 });

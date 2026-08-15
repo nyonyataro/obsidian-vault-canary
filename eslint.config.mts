@@ -8,6 +8,7 @@ export default defineConfig(
 		'coverage',
 		'esbuild.config.mjs',
 		'version-bump.mjs',
+		'release-check.mjs',
 		'versions.json',
 		'main.js',
 		'package.json',

@@ -1,6 +1,12 @@
 # Vault Canary
 
+[日本語のREADME](README.ja.md)
+
 Vault Canary is a small, local-first Obsidian plugin that warns when the visible contents of your vault unexpectedly shrink.
+
+Vault Canary requires Obsidian 1.13.0 or later.
+
+The settings, notices, and command names follow Obsidian's Japanese interface by default. You can also force Japanese or English from the plugin settings.
 
 It is meant to catch the kind of problem that can otherwise stay unnoticed for hours or days: a sync mistake, a broken automation, or another tool deleting a large set of files.
 
@@ -14,7 +20,7 @@ Vault Canary keeps a lightweight baseline containing only aggregate metrics:
 - Markdown note count
 - total size of visible vault files
 
-It then checks the current vault after startup, periodically, and shortly after create/delete/rename events.
+It then checks the current vault after startup, periodically, and shortly after file create, delete, rename, or modify events.
 
 By default it warns when any of these happen:
 
@@ -28,7 +34,7 @@ All thresholds are configurable.
 
 ## Safety behavior
 
-A warning does **not** automatically replace the saved baseline with the smaller state. This is intentional: an accidental deletion should not silently become the new normal.
+A warning does **not** automatically replace the saved baseline with the smaller state. This is intentional: an accidental deletion should not silently become the new normal. After a warning, the baseline remains until the aggregate metrics recover to at least the previous baseline or you explicitly set a new baseline.
 
 After you review sync or backups, use **Set current vault state as baseline** only if the shrink was expected.
 
@@ -63,7 +69,7 @@ Vault Canary uses Obsidian's public Vault API. It therefore monitors files that 
 
 ## Privacy
 
-Vault Canary runs locally. It stores only settings, the aggregate baseline, and the last alert time in the plugin's normal data file. It does not read note contents, upload data, or use analytics.
+Vault Canary runs locally. It stores only settings, the aggregate baseline, the unresolved-shrink state, and the last alert time in the plugin's normal data file. It does not read note contents, upload data, or use analytics.
 
 ## Installation
 

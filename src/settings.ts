@@ -1,6 +1,15 @@
-import { App, PluginSettingTab, Setting } from 'obsidian';
-import { normalizeExcludedFolders } from './core';
+import { Notice, PluginSettingTab } from 'obsidian';
+import type {
+	App,
+	SettingDefinition,
+	SettingDefinitionItem,
+} from 'obsidian';
 import type { CanaryThresholds } from './core';
+import {
+	isLocalePreference,
+	t,
+	type LocalePreference,
+} from './i18n';
 import type VaultCanaryPlugin from './main';
 
 export interface VaultCanarySettings extends CanaryThresholds {
@@ -8,6 +17,7 @@ export interface VaultCanarySettings extends CanaryThresholds {
 	startupDelaySeconds: number;
 	alertCooldownMinutes: number;
 	excludedFolders: string[];
+	locale: LocalePreference;
 }
 
 export const DEFAULT_SETTINGS: VaultCanarySettings = {
@@ -20,6 +30,34 @@ export const DEFAULT_SETTINGS: VaultCanarySettings = {
 	markdownDropPercent: 10,
 	sizeDropPercent: 20,
 	excludedFolders: [],
+	locale: 'auto',
+};
+
+type NumericSettingKey =
+	| 'checkIntervalMinutes'
+	| 'startupDelaySeconds'
+	| 'alertCooldownMinutes'
+	| 'minimumFileDrop'
+	| 'fileDropPercent'
+	| 'minimumMarkdownDrop'
+	| 'markdownDropPercent'
+	| 'sizeDropPercent';
+
+interface NumericSettingRange {
+	min: number;
+	max: number;
+	step: number;
+}
+
+const NUMERIC_SETTING_RANGES: Record<NumericSettingKey, NumericSettingRange> = {
+	checkIntervalMinutes: { min: 5, max: 1_440, step: 1 },
+	startupDelaySeconds: { min: 10, max: 600, step: 1 },
+	alertCooldownMinutes: { min: 1, max: 1_440, step: 1 },
+	minimumFileDrop: { min: 1, max: 100_000, step: 1 },
+	fileDropPercent: { min: 0.1, max: 100, step: 0.1 },
+	minimumMarkdownDrop: { min: 1, max: 100_000, step: 1 },
+	markdownDropPercent: { min: 0.1, max: 100, step: 0.1 },
+	sizeDropPercent: { min: 0.1, max: 100, step: 0.1 },
 };
 
 export class VaultCanarySettingTab extends PluginSettingTab {
@@ -27,172 +65,231 @@ export class VaultCanarySettingTab extends PluginSettingTab {
 		super(app, plugin);
 	}
 
-	display(): void {
-		const { containerEl } = this;
-		containerEl.empty();
+	getSettingDefinitions(): SettingDefinitionItem[] {
+		const locale = this.plugin.locale;
 
-		containerEl.createEl('p', {
-			text: 'Warn when the visible vault unexpectedly loses files, Markdown notes, or total storage size. Vault Canary never modifies note content.',
-		});
-
-		new Setting(containerEl)
-			.setName('Check now')
-			.setDesc('Compare the current vault against the saved baseline.')
-			.addButton((button) =>
-				button.setButtonText('Check').onClick(async () => {
-					await this.plugin.checkVault('manual', true);
-				}),
-			);
-
-		new Setting(containerEl)
-			.setName('Set current state as baseline')
-			.setDesc('Accept the current file counts and size as the new normal state.')
-			.addButton((button) =>
-				button.setButtonText('Set baseline').onClick(async () => {
-					await this.plugin.setCurrentAsBaseline(true);
-					this.display();
-				}),
-			);
-
-		if (this.plugin.baseline !== null) {
-			containerEl.createEl('p', {
-				text:
-					`Current baseline: ${this.plugin.baseline.fileCount.toLocaleString()} files, ` +
-					`${this.plugin.baseline.markdownCount.toLocaleString()} Markdown notes, ` +
-					`${formatBytes(this.plugin.baseline.totalBytes)}.`,
-			});
-		} else {
-			containerEl.createEl('p', {
-				text: 'No baseline is stored yet. Vault Canary will create one on the next check.',
-			});
-		}
-
-		new Setting(containerEl).setName('Monitoring').setHeading();
-		this.addNumberSetting(
-			containerEl,
-			'Check interval (minutes)',
-			'Periodic checks run at approximately this interval. Minimum: 5 minutes.',
-			this.plugin.settings.checkIntervalMinutes,
-			5,
-			1_440,
-			(value) => (this.plugin.settings.checkIntervalMinutes = value),
-		);
-		this.addNumberSetting(
-			containerEl,
-			'Startup delay (seconds)',
-			'Wait after the workspace is ready before the first automatic check. This reduces false alarms while sync settles. Changes apply on the next plugin reload.',
-			this.plugin.settings.startupDelaySeconds,
-			10,
-			600,
-			(value) => (this.plugin.settings.startupDelaySeconds = value),
-		);
-		this.addNumberSetting(
-			containerEl,
-			'Alert cooldown (minutes)',
-			'Automatic alerts for an unresolved shrink are rate-limited by this duration.',
-			this.plugin.settings.alertCooldownMinutes,
-			1,
-			1_440,
-			(value) => (this.plugin.settings.alertCooldownMinutes = value),
-		);
-
-		new Setting(containerEl).setName('Detection thresholds').setHeading();
-		this.addNumberSetting(
-			containerEl,
-			'Minimum file drop',
-			'Alert when at least this many visible files disappear, even if the percentage is small.',
-			this.plugin.settings.minimumFileDrop,
-			1,
-			100_000,
-			(value) => (this.plugin.settings.minimumFileDrop = value),
-		);
-		this.addNumberSetting(
-			containerEl,
-			'File drop (%)',
-			'Alert when the visible file count drops by this percentage. Percentage detection starts at 100 baseline files.',
-			this.plugin.settings.fileDropPercent,
-			0.1,
-			100,
-			(value) => (this.plugin.settings.fileDropPercent = value),
-		);
-		this.addNumberSetting(
-			containerEl,
-			'Minimum Markdown drop',
-			'Alert when at least this many Markdown notes disappear.',
-			this.plugin.settings.minimumMarkdownDrop,
-			1,
-			100_000,
-			(value) => (this.plugin.settings.minimumMarkdownDrop = value),
-		);
-		this.addNumberSetting(
-			containerEl,
-			'Markdown drop (%)',
-			'Alert when Markdown note count drops by this percentage. Percentage detection starts at 50 baseline notes.',
-			this.plugin.settings.markdownDropPercent,
-			0.1,
-			100,
-			(value) => (this.plugin.settings.markdownDropPercent = value),
-		);
-		this.addNumberSetting(
-			containerEl,
-			'Storage size drop (%)',
-			'Alert when the total size of visible vault files drops by this percentage.',
-			this.plugin.settings.sizeDropPercent,
-			0.1,
-			100,
-			(value) => (this.plugin.settings.sizeDropPercent = value),
-		);
-
-		new Setting(containerEl).setName('Scope').setHeading();
-		new Setting(containerEl)
-			.setName('Excluded folders')
-			.setDesc('One vault-relative folder per line. Folder contents are ignored. Changing this list clears the old baseline so different scopes are not compared.')
-			.addTextArea((text) => {
-				text.setPlaceholder('Archive\nGenerated/cache')
-					.setValue(this.plugin.settings.excludedFolders.join('\n'))
-					.onChange(async (value) => {
-						await this.plugin.updateExcludedFolders(
-							normalizeExcludedFolders(value.split('\n')),
-						);
-					});
-			});
-
-		containerEl.createEl('p', {
-			text: 'Vault Canary is an early-warning signal, not a backup. Keep a separate backup or version history for recovery.',
-		});
+		return [
+			{
+				name: t(locale, 'settings.title'),
+				desc: t(locale, 'settings.description'),
+			},
+			{
+				type: 'group',
+				heading: t(locale, 'settings.general'),
+				items: [
+					{
+						name: t(locale, 'settings.language'),
+						desc: t(locale, 'settings.languageDesc'),
+						control: {
+							type: 'dropdown',
+							key: 'locale',
+							defaultValue: DEFAULT_SETTINGS.locale,
+							options: {
+								auto: t(locale, 'language.auto'),
+								ja: t(locale, 'language.japanese'),
+								en: t(locale, 'language.english'),
+							},
+						},
+					},
+				],
+			},
+			{
+				type: 'group',
+				heading: t(locale, 'settings.actions'),
+				items: [
+					this.actionDefinition(
+						t(locale, 'settings.checkNow'),
+						t(locale, 'settings.checkNowDesc'),
+						t(locale, 'settings.check'),
+						() => this.plugin.checkVault('manual', true),
+					),
+					this.actionDefinition(
+						t(locale, 'settings.setBaseline'),
+						t(locale, 'settings.setBaselineDesc'),
+						t(locale, 'settings.setBaselineButton'),
+						() => this.plugin.setCurrentAsBaseline(true),
+					),
+					{
+						name: t(locale, 'settings.currentBaseline'),
+						desc: describeBaseline(this.plugin.baseline, locale),
+					},
+				],
+			},
+			{
+				type: 'group',
+				heading: t(locale, 'settings.monitoring'),
+				items: [
+					this.numericDefinition(
+						t(locale, 'settings.checkInterval'),
+						t(locale, 'settings.checkIntervalDesc'),
+						'checkIntervalMinutes',
+					),
+					this.numericDefinition(
+						t(locale, 'settings.startupDelay'),
+						t(locale, 'settings.startupDelayDesc'),
+						'startupDelaySeconds',
+					),
+					this.numericDefinition(
+						t(locale, 'settings.cooldown'),
+						t(locale, 'settings.cooldownDesc'),
+						'alertCooldownMinutes',
+					),
+				],
+			},
+			{
+				type: 'group',
+				heading: t(locale, 'settings.thresholds'),
+				items: [
+					this.numericDefinition(
+						t(locale, 'settings.minimumFileDrop'),
+						t(locale, 'settings.minimumFileDropDesc'),
+						'minimumFileDrop',
+					),
+					this.numericDefinition(
+						t(locale, 'settings.fileDropPercent'),
+						t(locale, 'settings.fileDropPercentDesc'),
+						'fileDropPercent',
+					),
+					this.numericDefinition(
+						t(locale, 'settings.minimumMarkdownDrop'),
+						t(locale, 'settings.minimumMarkdownDropDesc'),
+						'minimumMarkdownDrop',
+					),
+					this.numericDefinition(
+						t(locale, 'settings.markdownDropPercent'),
+						t(locale, 'settings.markdownDropPercentDesc'),
+						'markdownDropPercent',
+					),
+					this.numericDefinition(
+						t(locale, 'settings.sizeDropPercent'),
+						t(locale, 'settings.sizeDropPercentDesc'),
+						'sizeDropPercent',
+					),
+				],
+			},
+			{
+				type: 'group',
+				heading: t(locale, 'settings.scope'),
+				items: [
+					{
+						name: t(locale, 'settings.excludedFolders'),
+						desc: t(locale, 'settings.excludedFoldersDesc'),
+						control: {
+							type: 'textarea',
+							key: 'excludedFoldersText',
+							placeholder: t(locale, 'settings.excludedFoldersPlaceholder'),
+							rows: 3,
+						},
+					},
+				],
+			},
+			{
+				name: t(locale, 'settings.safety'),
+				desc: t(locale, 'settings.safetyDesc'),
+			},
+		];
 	}
 
-	private addNumberSetting(
-		containerEl: HTMLElement,
+	getControlValue(key: string): unknown {
+		if (key === 'locale') {
+			return this.plugin.settings.locale;
+		}
+		if (key === 'excludedFoldersText') {
+			return this.plugin.settings.excludedFolders.join('\n');
+		}
+		return this.plugin.settings[key as keyof VaultCanarySettings];
+	}
+
+	async setControlValue(key: string, value: unknown): Promise<void> {
+		if (key === 'locale') {
+			if (!isLocalePreference(value)) {
+				return;
+			}
+			this.plugin.settings.locale = value;
+			await this.plugin.saveSettings();
+			new Notice(t(this.plugin.locale, 'notice.languageChanged'));
+			this.update();
+			return;
+		}
+		if (key === 'excludedFoldersText') {
+			await this.plugin.updateExcludedFolders(String(value).split(/\r?\n/));
+			return;
+		}
+
+		if (!isNumericSettingKey(key) || typeof value !== 'number' || !Number.isFinite(value)) {
+			return;
+		}
+
+		const range = NUMERIC_SETTING_RANGES[key];
+		this.plugin.settings[key] = Math.min(range.max, Math.max(range.min, value));
+		await this.plugin.saveSettings();
+	}
+
+	private actionDefinition(
 		name: string,
-		description: string,
-		currentValue: number,
-		minimum: number,
-		maximum: number,
-		apply: (value: number) => void,
-	): void {
-		new Setting(containerEl)
-			.setName(name)
-			.setDesc(description)
-			.addText((text) =>
-				text
-					.setValue(String(currentValue))
-					.onChange(async (rawValue) => {
-						const parsed = Number(rawValue);
-						if (!Number.isFinite(parsed)) {
-							return;
+		desc: string,
+		buttonText: string,
+		action: () => Promise<void>,
+	): SettingDefinition {
+		return {
+			name,
+			desc,
+			render: (setting) => {
+				setting.addButton((button) =>
+					button.setButtonText(buttonText).onClick(async () => {
+						try {
+							await action();
+						} finally {
+							this.update();
 						}
-						const clamped = Math.min(maximum, Math.max(minimum, parsed));
-						apply(clamped);
-						await this.plugin.saveSettings();
 					}),
-			);
+				);
+			},
+		};
+	}
+
+	private numericDefinition(
+		name: string,
+		desc: string,
+		key: NumericSettingKey,
+	): SettingDefinition {
+		const range = NUMERIC_SETTING_RANGES[key];
+		return {
+			name,
+			desc,
+			control: {
+				type: 'number',
+				key,
+				defaultValue: DEFAULT_SETTINGS[key],
+				min: range.min,
+				max: range.max,
+				step: range.step,
+			},
+		};
 	}
 }
 
-function formatBytes(bytes: number): string {
+function isNumericSettingKey(key: string): key is NumericSettingKey {
+	return Object.prototype.hasOwnProperty.call(NUMERIC_SETTING_RANGES, key);
+}
+
+function describeBaseline(
+	baseline: VaultCanaryPlugin['baseline'],
+	locale: VaultCanaryPlugin['locale'],
+): string {
+	if (baseline === null) {
+		return t(locale, 'settings.noBaseline');
+	}
+	return t(locale, 'settings.baseline', {
+		files: baseline.fileCount.toLocaleString(locale),
+		markdown: baseline.markdownCount.toLocaleString(locale),
+		size: formatBytes(baseline.totalBytes, locale),
+	});
+}
+
+function formatBytes(bytes: number, locale: VaultCanaryPlugin['locale']): string {
 	if (bytes < 1_024) {
-		return `${bytes.toLocaleString()} B`;
+		return `${bytes.toLocaleString(locale)} B`;
 	}
 	const units = ['KB', 'MB', 'GB', 'TB'];
 	let value = bytes / 1_024;

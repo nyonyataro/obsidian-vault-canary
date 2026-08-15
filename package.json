@@ -9,7 +9,9 @@
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"lint": "eslint .",
 		"test": "vitest run",
-		"check": "npm run lint && npm run test && npm run build",
+		"test:run": "vitest run",
+		"check": "npm run lint && npm run test:run && npm run build",
+		"release:check": "node release-check.mjs",
 		"version": "node version-bump.mjs && git add manifest.json versions.json"
 	},
 	"keywords": ["obsidian", "backup", "data-loss", "monitoring"],
